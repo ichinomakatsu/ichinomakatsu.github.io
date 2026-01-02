@@ -1,0 +1,220 @@
+ <!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Xóa Phông Siêu Tốc</title>
+    <style>
+        /* GIỮ NGUYÊN GIAO DIỆN ĐẸP */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: #333;
+        }
+
+        .container {
+            background: white;
+            padding: 25px;
+            border-radius: 20px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            width: 100%;
+            max-width: 500px;
+            text-align: center;
+        }
+
+        h1 { color: #4a4a4a; margin-bottom: 5px; font-size: 24px; }
+        p { color: #888; font-size: 14px; margin-bottom: 20px; }
+
+        .custom-file-upload {
+            border: 2px dashed #ccc;
+            display: inline-block;
+            padding: 15px 30px;
+            cursor: pointer;
+            border-radius: 10px;
+            width: 80%;
+            background: #f9f9f9;
+            transition: all 0.3s;
+            color: #666;
+            font-weight: bold;
+        }
+
+        .custom-file-upload:hover { background: #eef2ff; border-color: #667eea; color: #667eea; }
+        input[type="file"] { display: none; }
+
+        .action-btn {
+            background: linear-gradient(to right, #667eea, #764ba2);
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 50px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(118, 75, 162, 0.4);
+            margin: 10px auto;
+            display: none;
+        }
+
+        .download-btn {
+            background: #28a745;
+            color: white;
+            padding: 10px 20px;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: bold;
+            display: inline-block;
+            margin-top: 15px;
+            box-shadow: 0 4px 10px rgba(40, 167, 69, 0.3);
+        }
+
+        .result-container {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+            justify-content: center;
+        }
+
+        .image-box { flex: 1; display: flex; flex-direction: column; align-items: center; }
+        .image-box img {
+            width: 100%;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+            object-fit: contain;
+            max-height: 200px;
+            background-image: url('https://checkerboard.cool/checkerboard.png');
+            background-size: 20px;
+        }
+        
+        .label { font-size: 12px; color: #666; margin-bottom: 5px; font-weight: bold; }
+
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+            display: none;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        #resultSection { display: none; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>🔍 Xóa Phông AI</h1>
+        <p>Phiên bản v2.0 (Fix lỗi tải thư viện)</p>
+
+        <label for="fileInput" class="custom-file-upload">
+            📂 Chạm để chọn ảnh
+        </label>
+        <input type="file" id="fileInput" accept="image/*">
+
+        <div id="previewSection" style="display:none; margin-top: 15px;">
+            <img id="previewImg" style="max-width: 150px; border-radius: 10px; border: 2px solid #eee;">
+            <br>
+            <button id="processBtn" class="action-btn">✨ Bắt đầu tách nền</button>
+        </div>
+
+        <div id="loader" class="loader"></div>
+        <p id="statusText" style="display:none; font-size: 12px; color: #667eea;"></p>
+
+        <div id="resultSection">
+            <div class="result-container">
+                <div class="image-box">
+                    <span class="label">Ảnh gốc</span>
+                    <img id="originalDisplay">
+                </div>
+                <div class="image-box">
+                    <span class="label">Đã xóa nền</span>
+                    <img id="processedDisplay">
+                </div>
+            </div>
+            <a id="downloadLink" class="download-btn" download="anh-xoa-nen.png">⬇️ Tải ảnh về máy</a>
+        </div>
+    </div>
+
+    <script type="module">
+        // Import trực tiếp từ CDN với phiên bản mới nhất
+        import removeBackground from "https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.5.5/+esm";
+
+        const fileInput = document.getElementById('fileInput');
+        const previewSection = document.getElementById('previewSection');
+        const previewImg = document.getElementById('previewImg');
+        const processBtn = document.getElementById('processBtn');
+        const loader = document.getElementById('loader');
+        const statusText = document.getElementById('statusText');
+        const resultSection = document.getElementById('resultSection');
+        const originalDisplay = document.getElementById('originalDisplay');
+        const processedDisplay = document.getElementById('processedDisplay');
+        const downloadLink = document.getElementById('downloadLink');
+
+        let selectedFile = null;
+
+        fileInput.addEventListener('change', (event) => {
+            selectedFile = event.target.files[0];
+            if (selectedFile) {
+                const url = URL.createObjectURL(selectedFile);
+                previewImg.src = url;
+                previewSection.style.display = 'block';
+                processBtn.style.display = 'inline-block';
+                resultSection.style.display = 'none';
+                statusText.style.display = 'none';
+            }
+        });
+
+        processBtn.addEventListener('click', async () => {
+            if (!selectedFile) return;
+
+            processBtn.style.display = 'none';
+            loader.style.display = 'block';
+            statusText.style.display = 'block';
+            statusText.innerText = "Đang tải dữ liệu AI (Lần đầu sẽ mất 20-30s)...";
+            statusText.style.color = "#667eea";
+
+            try {
+                // Cấu hình đường dẫn để tải file model .wasm và .onnx
+                const config = {
+                    publicPath: "https://static.img.ly/background-removal-data/1.5.5/",
+                    progress: (key, current, total) => {
+                        // Hiển thị tiến trình tải
+                        const percent = Math.round((current / total) * 100);
+                        statusText.innerText = `Đang tải tài nguyên AI: ${percent}%`;
+                    }
+                };
+
+                // Gọi hàm xóa nền (đã được import ở trên)
+                const blob = await removeBackground(selectedFile, config);
+                
+                statusText.innerText = "Đang xử lý hình ảnh...";
+                
+                const processedUrl = URL.createObjectURL(blob);
+                const originalUrl = URL.createObjectURL(selectedFile);
+
+                originalDisplay.src = originalUrl;
+                processedDisplay.src = processedUrl;
+                downloadLink.href = processedUrl;
+
+                loader.style.display = 'none';
+                statusText.style.display = 'none';
+                resultSection.style.display = 'block';
+
+            } catch (error) {
+                console.error(error);
+                loader.style.display = 'none';
+                statusText.innerText = "Lỗi: " + error.message;
+                statusText.style.color = "red";
+                processBtn.style.display = 'inline-block';
+            }
+        });
+    </script>
+</body>
+</html>
