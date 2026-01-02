@@ -1,0 +1,60 @@
+name: Cleanup Old Music Files
+
+on:
+  schedule:
+    # Chạy mỗi giờ một lần
+    - cron: '0 * * * *'
+  workflow_dispatch: # Cho phép bấm chạy thủ công
+
+jobs:
+  delete_old_files:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Find and delete files older than 3 hours
+        run: |
+          # Cấu hình
+          TARGET_DIR="uploads"
+          EXTENSION=".aac"
+          HOURS=3
+          
+          # Cài đặt git user
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          
+          # Tính thời gian
+          current_ts=$(date +%s)
+          cutoff_ts=$((current_ts - (HOURS * 3600)))
+          
+          echo "Checking for files older than $HOURS hours..."
+          
+          if [ ! -d "$TARGET_DIR" ]; then
+            echo "Folder $TARGET_DIR does not exist yet. Skipping."
+            exit 0
+          fi
+
+          # Tìm và xóa
+          find $TARGET_DIR -name "*$EXTENSION" | while read file; do
+            file_ts=$(git log -1 --format=%ct -- "$file")
+            if [ -z "$file_ts" ]; then continue; fi
+
+            if [ $file_ts -lt $cutoff_ts ]; then
+              echo "Deleting: $file"
+              git rm "$file"
+            fi
+          done
+          
+          # Commit thay đổi
+          if git diff --staged --quiet; then
+            echo "No files to delete."
+          else
+            git commit -m "Auto-delete old .aac files [Bot]"
+            git push
+          fi
