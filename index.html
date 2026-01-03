@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Thư viện Media Pro</title>
+    <style>
+        /* --- CẤU HÌNH GIAO DIỆN --- */
+        :root {
+            --bg-color: #0d1117;
+            --card-bg: #161b22;
+            --text-main: #e6edf3;
+            --accent: #2f81f7;
+            --danger: #fa4549;
+            --overlay: rgba(0, 0, 0, 0.85);
+            --ripple-color: rgba(255, 255, 255, 0.3);
+        }
+
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        h1 { 
+            margin-bottom: 25px; 
+            font-size: 1.8rem; 
+            text-align: center; 
+            background: linear-gradient(90deg, #58a6ff, #a371f7);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-weight: 800;
+        }
+
+        /* --- LƯỚI ẢNH 2 CỘT --- */
+        #gallery {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            width: 100%;
+            max-width: 800px;
+            margin-bottom: 100px;
+        }
+
+        .media-item {
+            position: relative;
+            background: var(--card-bg);
+            border-radius: 12px;
+            overflow: hidden;
+            aspect-ratio: 1 / 1;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+            cursor: pointer;
+            transition: transform 0.2s;
+            border: 1px solid #30363d;
+            user-select: none; 
+            -webkit-user-select: none;
+        }
+
+        .media-item:active { transform: scale(0.96); }
+
+        .media-item img, .media-item video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+            pointer-events: none; 
+        }
+
+        /* Dấu tick xanh */
+        .media-item.selected {
+            border: 3px solid var(--accent);
+            transform: scale(0.95);
+        }
+        .media-item.selected::after {
+            content: "✔";
+            position: absolute;
+            top: 8px; right: 8px;
+            background: var(--accent);
+            color: white;
+            border-radius: 50%;
+            width: 28px; height: 28px;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: bold;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+            animation: popIn 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        /* --- NÚT BẤM --- */
+        button {
+            position: relative;
+            overflow: hidden;
+            border: none;
+            outline: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+            background: var(--card-bg);
+            color: var(--text-main);
+            border: 1px solid #30363d;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+        button:active { transform: scale(0.92); }
+
+        /* Ripple Effect */
+        button::after {
+            content: "";
+            position: absolute;
+            width: 100%; height: 100%;
+            top: 0; left: 0;
+            pointer-events: none;
+            background-image: radial-gradient(circle, var(--ripple-color) 10%, transparent 10.01%);
+            background-repeat: no-repeat;
+            background-position: 50%;
+            transform: scale(10, 10);
+            opacity: 0;
+            transition: transform .5s, opacity 1s;
+        }
+        button:active::after { transform: scale(0, 0); opacity: .3; transition: 0s; }
+
+        .btn-primary { background: var(--accent); color: white; border: none; }
+        .btn-danger { background: var(--danger); color: white; border: none; }
+        
+        .pagination {
+            display: flex; gap: 10px; margin-top: 20px; align-items: center;
+            background: #21262d; padding: 10px; border-radius: 12px;
+        }
+
+        /* --- MODAL --- */
+        .modal {
+            display: none;
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--overlay);
+            z-index: 1000;
+            justify-content: center; align-items: center;
+            backdrop-filter: blur(5px);
+            animation: fadeIn 0.2s ease;
+        }
+
+        .modal-content {
+            background: #21262d; padding: 25px; border-radius: 16px;
+            width: 90%; max-width: 350px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+            display: flex; flex-direction: column; gap: 15px;
+            border: 1px solid #30363d;
+        }
+
+        input {
+            width: 100%; padding: 12px; background: #0d1117;
+            border: 1px solid #30363d; border-radius: 8px;
+            color: white; font-size: 16px; outline: none; margin-bottom: 5px;
+        }
+        input:focus { border-color: var(--accent); }
+
+        /* --- NÚT XÓA HÀNG LOẠT --- */
+        #batch-delete-bar {
+            position: fixed; bottom: 20px; left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: #21262d; padding: 15px 25px; border-radius: 50px;
+            display: flex; align-items: center; gap: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5); z-index: 900;
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            border: 1px solid #30363d;
+        }
+        #batch-delete-bar.show { transform: translateX(-50%) translateY(0); }
+
+        #toast {
+            visibility: hidden; min-width: 250px; background-color: #333;
+            color: #fff; text-align: center; border-radius: 8px; padding: 16px;
+            position: fixed; z-index: 2000; left: 50%; bottom: 30px;
+            transform: translateX(-50%); font-size: 17px; opacity: 0;
+            transition: opacity 0.3s, bottom 0.3s;
+        }
+        #toast.show { visibility: visible; opacity: 1; bottom: 50px; }
+
+        @keyframes fadeIn { from {opacity: 0;} to {opacity: 1;} }
+        @keyframes popIn { 0% {transform: scale(0);} 80% {transform: scale(1.2);} 100% {transform: scale(1);} }
+        .loader {
+            border: 4px solid #f3f3f3; border-top: 4px solid var(--accent);
+            border-radius: 50%; width: 30px; height: 30px;
+            animation: spin 1s linear infinite; margin: 20px auto;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+    </style>
+</head>
+<body>
+
+    <h1>🚀 Media Manager</h1>
+    
+    <div id="loading" style="text-align: center;">
+        <div class="loader"></div>
+        <p>Đang tải dữ liệu...</p>
+    </div>
+
+    <div id="gallery"></div>
+
+    <div class="pagination">
+        <button id="btn-first" onclick="goFirst()">↞</button>
+        <button id="btn-prev" onclick="changePage(-1)">❮</button>
+        <span id="page-info" style="font-weight: bold; margin: 0 10px;">1 / 1</span>
+        <button id="btn-next" onclick="changePage(1)">❯</button>
+    </div>
+
+    <div id="batch-delete-bar">
+        <span style="font-weight: bold;">Đã chọn: <span id="count-select" style="color: var(--accent)">0</span></span>
+        <button class="btn-danger" onclick="confirmBatchDelete()">🗑️ Xóa ngay</button>
+        <button onclick="cancelBatchMode()">Hủy</button>
+    </div>
+
+    <div id="view-modal" class="modal" onclick="if(event.target===this) closeModal()">
+        <div style="width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center;">
+            <div id="media-container" style="max-width: 100%; max-height: 80vh; display: flex; justify-content: center;"></div>
+            <div style="margin-top: 20px; display: flex; gap: 15px;">
+                <a id="download-btn" href="#" download class="button btn-primary" style="text-decoration: none;">⬇ Tải về</a>
+                <button class="btn-danger" onclick="closeModal()">Đóng</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="pass-modal" class="modal">
+        <div class="modal-content">
+            <h3 style="margin: 0; text-align: center;">🔒 Xác thực Admin</h3>
+            <p style="font-size: 14px; color: #8b949e; text-align: center; margin: 0;">Nhập mật khẩu để xóa.</p>
+            
+            <input type="password" id="password-input" placeholder="Mật khẩu (ThanhDuyGaming)">
+            
+            <div id="token-section">
+                <p style="font-size: 12px; color: #fa4549; margin-bottom: 5px; margin-top: 10px;">⚠ Nhập Token GitHub (Lần đầu):</p>
+                <input type="password" id="token-input" placeholder="ghp_xxxxxxxxxxxx">
+            </div>
+
+            <div style="display: flex; gap: 10px; margin-top: 10px;">
+                <button style="flex: 1;" onclick="closePassModal()">Hủy</button>
+                <button class="btn-primary" style="flex: 1;" onclick="verifyPassword()">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="delete-option-modal" class="modal">
+        <div class="modal-content">
+            <h3 style="text-align: center;">Bạn muốn xóa?</h3>
+            <button class="btn-danger" onclick="processSingleDelete()">🗑️ Xóa 1 file này</button>
+            <button class="btn-primary" onclick="enableBatchMode()">✨ Chọn nhiều file</button>
+            <button onclick="closeDeleteOption()">Thoát</button>
+        </div>
+    </div>
+
+    <div id="toast">Thông báo</div>
+
+    <script>
+        // --- CẤU HÌNH ---
+        const REPO_OWNER = 'ichinomakatsu'; 
+        const REPO_NAME = 'ichinomakatsu.github.io';
+        const FOLDER_PATH = 'uploads';
+        const ITEMS_PER_PAGE = 20;
+
+        let allFiles = [];
+        let currentPage = 1;
+        let pressTimer;
+        let longPressTarget = null;
+        let isBatchMode = false;
+        let isScrolling = false; 
+        let selectedFiles = new Set();
+        // Lấy Token từ bộ nhớ trình duyệt (nếu có)
+        let githubToken = localStorage.getItem('gh_token') || '';
+
+        const gallery = document.getElementById('gallery');
+        const loading = document.getElementById('loading');
+
+        window.onload = loadFiles;
+
+        function showToast(message, isError = false) {
+            const x = document.getElementById("toast");
+            x.innerText = message;
+            x.style.backgroundColor = isError ? "#fa4549" : "#333";
+            x.className = "show";
+            setTimeout(function(){ x.className = x.className.replace("show", ""); }, 3000);
+        }
+
+        async function loadFiles() {
+            loading.style.display = 'block';
+            gallery.innerHTML = '';
+            try {
+                const response = await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${FOLDER_PATH}?t=${new Date().getTime()}`);
+                const data = await response.json();
+                if (Array.isArray(data)) {
+                    allFiles = data.filter(file => file.name.match(/\.(webp|jpg|jpeg|png|gif|mp4|webm)$/i));
+                    allFiles.reverse(); 
+                    renderPage(1);
+                } else {
+                    gallery.innerHTML = '<p style="grid-column: span 2; text-align:center">Thư mục trống.</p>';
+                }
+            } catch (error) {
+                console.error(error);
+                gallery.innerHTML = '<p style="grid-column: span 2; text-align:center; color: var(--danger)">Lỗi tải dữ liệu.</p>';
+            }
+            loading.style.display = 'none';
+        }
+
+        function renderPage(page) {
+            currentPage = page;
+            gallery.innerHTML = '';
+            const start = (page - 1) * ITEMS_PER_PAGE;
+            const end = start + ITEMS_PER_PAGE;
+            
+            allFiles.slice(start, end).forEach(file => {
+                const item = document.createElement('div');
+                item.className = 'media-item';
+                if (selectedFiles.has(file.sha)) item.classList.add('selected');
+
+                let content = file.name.match(/\.(mp4|webm)$/i) 
+                    ? `<video src="${file.download_url}#t=0.5" preload="metadata" muted style="pointer-events:none"></video>`
+                    : `<img src="${file.download_url}" loading="lazy" alt="${file.name}">`;
+                item.innerHTML = content;
+
+                // --- LOGIC TOUCH FIX SCROLL ---
+                item.addEventListener('touchstart', (e) => startPress(e, file), {passive: true});
+                item.addEventListener('touchmove', () => cancelPressOnMove(), {passive: true});
+                item.addEventListener('touchend', () => cancelPress(file));
+                item.addEventListener('mousedown', (e) => startPress(e, file));
+                item.addEventListener('mouseup', () => cancelPress(file));
+                item.addEventListener('mouseleave', () => cancelPress(file));
+                
+                item.onclick = (e) => {
+                    if (isBatchMode) {
+                        e.preventDefault();
+                        toggleSelection(file, item);
+                    }
+                };
+
+                gallery.appendChild(item);
+            });
+            updatePagination();
+        }
+
+        function startPress(e, file) {
+            if (isBatchMode) return;
+            isScrolling = false;
+            longPressTarget = file;
+            
+            // Giữ 2 giây mới hiện bảng
+            pressTimer = setTimeout(() => {
+                if (!isScrolling) { 
+                    if (navigator.vibrate) navigator.vibrate(50);
+                    showPassModal();
+                }
+            }, 2000); 
+        }
+
+        function cancelPressOnMove() {
+            isScrolling = true;
+            clearTimeout(pressTimer);
+            longPressTarget = null;
+        }
+
+        function cancelPress(file) {
+            clearTimeout(pressTimer);
+            if (!isBatchMode && !isScrolling && longPressTarget === file) {
+                 if(document.getElementById('pass-modal').style.display !== 'flex') {
+                     // An toàn rồi mới cho click
+                 }
+            }
+        }
+
+        document.addEventListener('click', function(e) {
+            const item = e.target.closest('.media-item');
+            if (item && !isBatchMode && !isScrolling) {
+                if(document.getElementById('pass-modal').style.display === 'none' && 
+                   document.getElementById('delete-option-modal').style.display === 'none') {
+                    
+                    const src = item.querySelector('img, video').getAttribute('src');
+                    const file = allFiles.find(f => src.includes(f.download_url) || f.download_url === src);
+                    if (file) openViewModal(file);
+                }
+            }
+        }, true);
+
+        // --- CÁC CHỨC NĂNG KHÁC ---
+        function openViewModal(file) {
+            const modal = document.getElementById('view-modal');
+            const container = document.getElementById('media-container');
+            document.getElementById('download-btn').href = file.download_url;
+            
+            container.innerHTML = file.name.match(/\.(mp4|webm)$/i)
+                ? `<video src="${file.download_url}" controls autoplay style="max-width:100%; max-height:70vh; border-radius:8px;"></video>`
+                : `<img src="${file.download_url}" style="max-width:100%; max-height:70vh; border-radius:8px; box-shadow:0 0 20px black;">`;
+            
+            modal.style.display = 'flex';
+        }
+
+        function closeModal() {
+            document.getElementById('view-modal').style.display = 'none';
+            const v = document.querySelector('#media-container video');
+            if(v) v.pause();
+        }
+
+        function showPassModal() {
+            document.getElementById('pass-modal').style.display = 'flex';
+            document.getElementById('password-input').focus();
+            
+            // Nếu đã có Token trong máy, ẩn ô nhập Token đi cho đỡ rối
+            if (githubToken) {
+                document.getElementById('token-section').style.display = 'none';
+            } else {
+                document.getElementById('token-section').style.display = 'block';
+            }
+        }
+
+        function closePassModal() {
+            document.getElementById('pass-modal').style.display = 'none';
+            document.getElementById('password-input').value = '';
+        }
+
+        function verifyPassword() {
+            const pass = document.getElementById('password-input').value;
+            const tokenInput = document.getElementById('token-input').value.trim();
+
+            if (pass === 'ThanhDuyGaming') {
+                // Nếu người dùng nhập Token mới, lưu lại
+                if (tokenInput) {
+                    githubToken = tokenInput;
+                    localStorage.setItem('gh_token', tokenInput);
+                }
+
+                // Kiểm tra xem đã có Token chưa
+                if (!githubToken) {
+                    showToast('⚠ Cần nhập Token lần đầu để xóa!', true);
+                    document.getElementById('token-section').style.display = 'block';
+                    return;
+                }
+
+                closePassModal();
+                document.getElementById('delete-option-modal').style.display = 'flex';
+            } else {
+                showToast('❌ Mật khẩu sai!', true);
+                if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+            }
+        }
+
+        function closeDeleteOption() { document.getElementById('delete-option-modal').style.display = 'none'; }
+
+        async function processSingleDelete() {
+            closeDeleteOption();
+            if (!longPressTarget) return;
+            if (confirm(`Xóa vĩnh viễn: ${longPressTarget.name}?`)) {
+                showToast('⏳ Đang xóa...', false);
+                await deleteFileAPI(longPressTarget);
+            }
+        }
+
+        function enableBatchMode() {
+            closeDeleteOption();
+            isBatchMode = true;
+            selectedFiles.clear();
+            if (longPressTarget) selectedFiles.add(longPressTarget.sha);
+            renderPage(currentPage);
+            document.getElementById('batch-delete-bar').classList.add('show');
+            showToast('Chạm vào ảnh để chọn nhiều');
+        }
+
+        function cancelBatchMode() {
+            isBatchMode = false;
+            selectedFiles.clear();
+            document.getElementById('batch-delete-bar').classList.remove('show');
+            renderPage(currentPage);
+        }
+
+        function toggleSelection(file, element) {
+            if (navigator.vibrate) navigator.vibrate(10);
+            if (selectedFiles.has(file.sha)) {
+                selectedFiles.delete(file.sha);
+                element.classList.remove('selected');
+            } else {
+                selectedFiles.add(file.sha);
+                element.classList.add('selected');
+            }
+            document.getElementById('count-select').innerText = selectedFiles.size;
+        }
+
+        async function confirmBatchDelete() {
+            if (selectedFiles.size === 0) return showToast('Chưa chọn file nào!', true);
+            if (confirm(`Xóa ${selectedFiles.size} file đã chọn?`)) {
+                document.querySelector('#batch-delete-bar button.btn-danger').innerText = 'Đang xóa...';
+                let deletedCount = 0;
+                for (const sha of selectedFiles) {
+                    const file = allFiles.find(f => f.sha === sha);
+                    if (file && await deleteFileAPI(file, true)) deletedCount++;
+                }
+                showToast(`✅ Đã xóa ${deletedCount} file!`);
+                cancelBatchMode();
+                loadFiles();
+            }
+        }
+
+        async function deleteFileAPI(file, silent = false) {
+            if (!githubToken) return false;
+
+            try {
+                const url = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${file.path}`;
+                const res = await fetch(url, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `token ${githubToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        message: `Delete ${file.name} (Web Cleanup)`,
+                        sha: file.sha
+                    })
+                });
+                if (res.ok) {
+                    if(!silent) { showToast('✅ Xóa thành công!'); loadFiles(); }
+                    return true;
+                } else {
+                    if(!silent) showToast('❌ Lỗi/Hết hạn Token', true);
+                    return false;
+                }
+            } catch (e) { console.error(e); return false; }
+        }
+
+        function changePage(step) {
+            const maxPage = Math.ceil(allFiles.length / ITEMS_PER_PAGE);
+            const newPage = currentPage + step;
+            if (newPage >= 1 && newPage <= maxPage) renderPage(newPage);
+        }
+        function goFirst() { renderPage(1); }
+        function updatePagination() {
+            const maxPage = Math.ceil(allFiles.length / ITEMS_PER_PAGE);
+            document.getElementById('page-info').innerText = `${currentPage} / ${maxPage || 1}`;
+            document.getElementById('btn-prev').disabled = (currentPage === 1);
+            document.getElementById('btn-next').disabled = (currentPage === maxPage || maxPage === 0);
+        }
+    </script>
+</body>
+  </html>
