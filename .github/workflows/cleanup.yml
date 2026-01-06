@@ -1,0 +1,73 @@
+ name: Cleanup Old Media Files
+
+on:
+  schedule:
+    # Chạy mỗi 15 phút để đảm bảo xóa file đúng giờ hơn
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+jobs:
+  delete_old_files:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Find and delete old files
+        run: |
+          TARGET_DIR="uploads"
+
+          # Cấu hình Git user
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+
+          current_ts=$(date +%s)
+
+          # --- CẤU HÌNH THỜI GIAN ---
+          # 3 tiếng = 3 * 3600 giây
+          aac_cutoff=$((current_ts - (3 * 3600)))
+          
+          # 1 tiếng 30 phút = 90 * 60 giây
+          mp4_cutoff=$((current_ts - (90 * 60)))
+          # --------------------------
+
+          if [ ! -d "$TARGET_DIR" ]; then
+            echo "Thư mục $TARGET_DIR không tồn tại."
+            exit 0
+          fi
+
+          # Xử lý file .aac (3 tiếng)
+          find "$TARGET_DIR" -name "*.aac" | while read -r file; do
+            file_ts=$(git log -1 --format=%ct -- "$file")
+            # Bỏ qua nếu không lấy được thời gian
+            if [ -z "$file_ts" ]; then continue; fi
+
+            if [ "$file_ts" -lt "$aac_cutoff" ]; then
+              echo "Deleting $file (Older than 3h)"
+              git rm "$file"
+            fi
+          done
+
+          # Xử lý file .mp4 (1 tiếng 30 phút)
+          find "$TARGET_DIR" -name "*.mp4" | while read -r file; do
+            file_ts=$(git log -1 --format=%ct -- "$file")
+            if [ -z "$file_ts" ]; then continue; fi
+
+            if [ "$file_ts" -lt "$mp4_cutoff" ]; then
+              echo "Deleting $file (Older than 1h30m)"
+              git rm "$file"
+            fi
+          done
+
+          # Kiểm tra xem có gì thay đổi để commit không
+          if git diff --staged --quiet; then
+            echo "No files to delete."
+          else
+            git commit -m "Auto-delete old media files [Bot]"
+            git push
+          fi
