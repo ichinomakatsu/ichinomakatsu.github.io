@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sticker Makatsu</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+--bg:#121212;--card:#1e1e1e;--text:#eee;
+--accent:#ff6b6b;--danger:#ff4757;--success:#2ed573;
+}
+*{box-sizing:border-box}
+body{
+margin:0;padding:15px;font-family:Nunito,sans-serif;
+background:var(--bg);color:var(--text);
+display:flex;flex-direction:column;align-items:center;
+padding-bottom:100px
+}
+header{
+width:100%;max-width:800px;
+display:flex;justify-content:space-between;align-items:center
+}
+h1{
+margin:0;font-size:1.4rem;font-weight:800;
+background:linear-gradient(45deg,#ff6b6b,#ffa502);
+-webkit-background-clip:text;-webkit-text-fill-color:transparent
+}
+button{cursor:pointer;font-family:inherit}
+.btn-menu{
+background:#222;border:1px solid #444;color:#fff;
+padding:8px 14px;border-radius:20px;font-weight:700
+}
+.dropdown{
+display:none;position:absolute;right:0;top:45px;
+background:#222;border:1px solid #444;border-radius:12px;
+overflow:hidden;z-index:10
+}
+.dropdown.show{display:block}
+.dropdown button{
+width:100%;padding:12px;border:none;
+background:none;color:#ddd;text-align:left
+}
+#gallery{
+margin-top:15px;
+display:grid;
+grid-template-columns:repeat(auto-fill,minmax(100px,1fr));
+gap:10px;width:100%;max-width:800px
+}
+.media-item{
+aspect-ratio:1/1;background:var(--card);
+border-radius:12px;overflow:hidden;position:relative
+}
+.media-item img,.media-item video{
+width:100%;height:100%;object-fit:cover
+}
+.media-item.selected{
+opacity:.5;border:3px solid var(--accent)
+}
+.media-item.selected::after{
+content:"✓";position:absolute;inset:0;
+display:flex;align-items:center;justify-content:center;
+font-size:2rem;color:white
+}
+#action-panel{
+display:none;position:fixed;bottom:10px;
+width:calc(100% - 30px);max-width:800px;
+background:#222;border-radius:15px;
+padding:15px;border:1px solid #444
+}
+#action-panel.show{display:block}
+.modal{
+display:none;position:fixed;inset:0;
+background:rgba(0,0,0,.9);
+justify-content:center;align-items:center;z-index:100
+}
+.modal-content{
+background:#222;padding:20px;border-radius:15px;
+width:85%;max-width:320px;text-align:center
+}
+#toast{
+position:fixed;bottom:30px;left:50%;
+transform:translateX(-50%);
+background:#333;color:#fff;
+padding:10px 20px;border-radius:30px;
+opacity:0;transition:.3s;z-index:200
+}
+#toast.show{opacity:1;bottom:50px}
+</style>
+</head>
+
+<body>
+
+<header>
+<h1>✨ Sticker Makatsu</h1>
+<div style="position:relative">
+<button class="btn-menu" onclick="toggleMenu()">⚙️</button>
+<div id="menu" class="dropdown">
+<button onclick="activateMode('download')">⬇ Tải nhiều</button>
+<button onclick="activateMode('delete')" style="color:var(--danger)">🗑️ Xóa</button>
+</div>
+</div>
+</header>
+
+<div id="gallery"></div>
+
+<div id="action-panel">
+<div><b>Đã chọn:</b> <span id="count">0</span></div>
+<button class="btn-menu" style="width:100%;margin-top:10px" onclick="executeAction()">Thực hiện</button>
+<button class="btn-menu" style="width:100%;margin-top:8px;background:#444" onclick="exitMode()">Hủy</button>
+</div>
+
+<!-- MODAL TẢI TỪNG FILE -->
+<div id="download-modal" class="modal">
+<div class="modal-content">
+<h3 id="dl-title">📥 Tải file</h3>
+<p id="dl-name" style="word-break:break-all"></p>
+<button class="btn-menu" style="width:100%;background:var(--success)" onclick="downloadNext()">⬇ Tải tiếp</button>
+<button class="btn-menu" style="width:100%;margin-top:8px;background:#444" onclick="cancelDownload()">Hủy</button>
+</div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const REPO_OWNER="ichinomakatsu";
+const REPO_NAME="ichinomakatsu.github.io";
+const FOLDER="uploads";
+
+let allFiles=[],selected=new Set();
+let mode="view";
+let queue=[];
+
+const gallery=document.getElementById("gallery");
+
+function showToast(t){
+const x=document.getElementById("toast");
+x.innerText=t;x.className="show";
+setTimeout(()=>x.className="",2500);
+}
+
+function toggleMenu(){
+document.getElementById("menu").classList.toggle("show");
+}
+
+async function loadFiles(){
+const res=await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${FOLDER}?t=${Date.now()}`);
+const data=await res.json();
+allFiles=data.filter(f=>f.name.match(/\.(png|jpg|jpeg|gif|webp|mp4)$/i)).reverse();
+render();
+}
+
+function render(){
+gallery.innerHTML="";
+allFiles.forEach(f=>{
+const d=document.createElement("div");
+d.className="media-item"+(selected.has(f.sha)?" selected":"");
+d.innerHTML=f.name.match(/mp4/)
+?`<video src="${f.download_url}" muted></video>`
+:`<img src="${f.download_url}">`;
+d.onclick=()=>clickItem(f,d);
+gallery.appendChild(d);
+});
+}
+
+function clickItem(file,el){
+if(mode==="view") return;
+if(selected.has(file.sha)){
+selected.delete(file.sha);el.classList.remove("selected");
+}else{
+selected.add(file.sha);el.classList.add("selected");
+}
+document.getElementById("count").innerText=selected.size;
+}
+
+function activateMode(m){
+mode=m;selected.clear();
+document.getElementById("action-panel").classList.add("show");
+render();
+}
+
+function exitMode(){
+mode="view";selected.clear();
+document.getElementById("action-panel").classList.remove("show");
+render();
+}
+
+function executeAction(){
+if(mode==="download") startQueue();
+}
+
+function startQueue(){
+queue=Array.from(selected).map(s=>allFiles.find(f=>f.sha===s));
+if(queue.length===0){showToast("Chưa chọn file");return;}
+document.getElementById("download-modal").style.display="flex";
+updateModal();
+}
+
+function updateModal(){
+if(queue.length===0){
+showToast("✅ Tải xong");
+document.getElementById("download-modal").style.display="none";
+exitMode();return;
+}
+document.getElementById("dl-name").innerText=queue[0].name;
+}
+
+function downloadNext(){
+const file=queue.shift();
+const a=document.createElement("a");
+a.href=file.download_url;
+a.download=file.name;
+a.target="_blank";
+document.body.appendChild(a);
+a.click();
+document.body.removeChild(a);
+setTimeout(updateModal,500);
+}
+
+function cancelDownload(){
+queue=[];
+document.getElementById("download-modal").style.display="none";
+showToast("⛔ Đã hủy");
+exitMode();
+}
+
+window.onload=loadFiles;
+</script>
+</body>
+</html>
